@@ -13,13 +13,7 @@ This project is a uBPF (universal Berkeley Packet Filter) virtual machine implem
 - **src**: Contains the source code for the uBPF VM and BPF bytecode loader.
 - **vm**: Houses the virtual machine implementation, including the sandboxed environment.
 
-## Build and Installation
 
-To build and install the project, follow these steps:
-
-1. Clone the repository to your local machine.
-2. Navigate to the project directory and run `zig build` to build the executable.
-3. Run `zig install` to install the executable on your system.
 
 ## Usage
 
@@ -87,3 +81,6 @@ valgrind ./zig-out/bin/ubpf-vm
 valgrind --leak-check=full ./zig-out/bin/ubpf-vm
 
 ```
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines and code of conduct before submitting pull requests.
