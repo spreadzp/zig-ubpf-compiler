@@ -25,7 +25,7 @@ extern "C"
 {
 #endif
 
-#include "../build/ubpf_config.h"
+#include <ubpf_config.h>
 
 #include <stdio.h>
 #include <stdint.h>
