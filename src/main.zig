@@ -1,69 +1,147 @@
 const std = @import("std");
-const c = @cImport({
-    @cInclude("ubpf.h");
-});
+
+pub const UbpfError = error{
+    Ok,
+    InvalidInstruction,
+    OutOfBounds,
+    DivideByZero,
+    UnsupportedCall,
+    InvalidMemory,
+    InvalidLength,
+    InvalidString,
+    InvalidMap,
+    InvalidHelper,
+    MaxInstructionsExceeded,
+    Unknown,
+};
+
+pub const UbpfVm = opaque {};
+
+pub const Helper = *const fn (?*UbpfVm, [*]const u64) callconv(.C) i64;
+
+pub extern "ubpf" fn ubpf_create() ?*UbpfVm;
+pub extern "ubpf" fn ubpf_destroy(vm: ?*UbpfVm) void;
+pub extern "ubpf" fn ubpf_load(vm: ?*UbpfVm, code: [*]const u8, code_len: usize) c_int;
+pub extern "ubpf" fn ubpf_exec(vm: ?*UbpfVm, mem: ?*const anyopaque, mem_len: usize, out_ret: *u64) c_int;
+pub extern "ubpf" fn ubpf_set_error_print(vm: ?*UbpfVm, enable: bool) void;
+pub extern "ubpf" fn ubpf_register(vm: ?*UbpfVm, idx: u32, fn_ptr: Helper) c_int;
+
+pub const Vm = struct {
+    vm: ?*UbpfVm,
+
+    const Self = @This();
+
+    pub fn init() !Self {
+        std.debug.print("Creating VM...\n", .{});
+        const vm = ubpf_create();
+        if (vm == null) {
+            std.debug.print("Failed to create VM\n", .{});
+            return error.FailedToCreateVm;
+        }
+        std.debug.print("VM created successfully at {*}\n", .{vm});
+        return Self{ .vm = vm };
+    }
+
+    pub fn deinit(self: *Self) void {
+        if (self.vm) |vm| {
+            std.debug.print("Destroying VM at {*}\n", .{vm});
+            ubpf_destroy(vm);
+            self.vm = null;
+        }
+    }
+
+    pub fn load(self: *Self, code: []const u8) !void {
+        std.debug.print("Loading code of length {} into VM at {*}\n", .{ code.len, self.vm });
+        if (self.vm == null) return error.InvalidMemory;
+
+        const result = ubpf_load(self.vm, code.ptr, code.len);
+        std.debug.print("Load result: {}\n", .{result});
+        if (result != 0) return UbpfError.InvalidInstruction;
+    }
+
+    pub fn exec(self: *Self, mem: ?[]const u8) !u64 {
+        std.debug.print("Executing VM at {*}\n", .{self.vm});
+        if (self.vm == null) return error.InvalidMemory;
+
+        var out_ret: u64 = undefined;
+        const result = ubpf_exec(
+            self.vm,
+            if (mem) |m| m.ptr else null,
+            if (mem) |m| m.len else 0,
+            &out_ret,
+        );
+        std.debug.print("Exec result: {}\n", .{result});
+
+        if (result != 0) {
+            return switch (result) {
+                1 => UbpfError.InvalidInstruction,
+                2 => UbpfError.OutOfBounds,
+                3 => UbpfError.DivideByZero,
+                4 => UbpfError.UnsupportedCall,
+                5 => UbpfError.InvalidMemory,
+                6 => UbpfError.InvalidLength,
+                7 => UbpfError.InvalidString,
+                8 => UbpfError.InvalidMap,
+                9 => UbpfError.InvalidHelper,
+                10 => UbpfError.MaxInstructionsExceeded,
+                else => UbpfError.Unknown,
+            };
+        }
+        return out_ret;
+    }
+
+    pub fn setErrorPrint(self: *Self, enable: bool) void {
+        std.debug.print("Setting error print to {} for VM at {*}\n", .{ enable, self.vm });
+        if (self.vm != null) {
+            ubpf_set_error_print(self.vm, enable);
+        }
+    }
+
+    pub fn registerHelper(self: *Self, idx: u32, helper: Helper) !void {
+        std.debug.print("Registering helper at index {} for VM at {*}\n", .{ idx, self.vm });
+        if (self.vm == null) return error.InvalidMemory;
+
+        const result = ubpf_register(self.vm, idx, helper);
+        std.debug.print("Register helper result: {}\n", .{result});
+        if (result != 0) return UbpfError.InvalidHelper;
+    }
+};
 
 pub fn main() !void {
-    // Create a uBPF VM instance
-    const vm = c.ubpf_create();
-    if (vm == null) {
-        std.debug.print("Failed to create uBPF VM\n", .{});
-        return error.VMCreationFailed;
-    }
-    std.debug.print("uBPF VM created successfully at address: {*}\n", .{vm});
-    defer c.ubpf_destroy(vm);
+    std.debug.print("Starting program\n", .{});
 
-    // Cast the VM pointer to a byte pointer for logging
-    const vm_ptr: [*]const u8 = @ptrCast(vm);
-    std.debug.print("VM pointer: {*}\n", .{vm_ptr});
+    var vm = try Vm.init();
+    defer vm.deinit();
 
-    // Example BPF bytecode
-    const code = [_]u8{
-        0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // mov r0, 1
-        0xb7, 0x01, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, // mov r1, 2
-        0x0f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // add r0, r1
-        0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // exit
+    std.debug.print("Enabling error printing\n", .{});
+    vm.setErrorPrint(true);
+
+    // Helper function with safe type conversion
+    const printHelper = struct {
+        fn helper(_: ?*UbpfVm, args: [*]const u64) callconv(.C) i64 {
+            std.debug.print("Helper called with args at {*}\n", .{args});
+            const value = args[0];
+            std.debug.print("Helper arg value: {}\n", .{value});
+            if (value > std.math.maxInt(i64)) {
+                return std.math.maxInt(i64);
+            }
+            return @intCast(value);
+        }
     };
-    std.debug.print("BPF bytecode loaded\n", .{});
 
-    // Load the BPF program into the VM
-    const code_ptr: [*]const u8 = @ptrCast(&code[0]);
-    const code_len = code.len;
+    std.debug.print("Registering helper function\n", .{});
+    try vm.registerHelper(1, &printHelper.helper);
 
-    // Log the code pointer address and length
-    std.debug.print("Code pointer: {*}, Code length: {}\n", .{ code_ptr, code_len });
+    // Example BPF code (just a placeholder)
+    const code = [_]u8{
+        // mov64 r0, 1
+        0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    };
 
-    if (code_len == 0) {
-        std.debug.print("Invalid bytecode length\n", .{});
-        return error.InvalidArgument;
-    }
+    std.debug.print("Loading BPF code\n", .{});
+    try vm.load(&code);
 
-    // Debug: Print the first few bytes of the bytecode
-    std.debug.print("Bytecode (first 8 bytes): {x}\n", .{code[0..8]});
-
-    // Allocate a buffer for the error message
-    var errmsg_buf: [*c]u8 = undefined; // Pointer to a null-terminated string
-    const errmsg: [*c][*c]u8 = &errmsg_buf; // Pointer to the pointer
-
-    // Call ubpf_load with the error message buffer
-    const load_result = c.ubpf_load(vm, code_ptr, code_len, errmsg);
-    if (load_result != 0) {
-        // Print the error message if the load failed
-        std.debug.print("Failed to load BPF program. Error: {s}\n", .{errmsg_buf});
-        return error.LoadFailed;
-    }
-    std.debug.print("BPF program loaded successfully\n", .{});
-
-    // Variable to store the return value
-    var return_value: u64 = 0;
-
-    // Execute the BPF program
-    const result = c.ubpf_exec(vm, null, 0, &return_value);
-
-    if (result != 0) {
-        std.debug.print("BPF execution failed with error code: {}\n", .{result});
-        return error.ExecutionFailed;
-    }
-
-    std.debug.print("Program executed successfully. Return value: {}\n", .{return_value});
+    std.debug.print("Executing BPF code\n", .{});
+    const result = try vm.exec(null);
+    std.debug.print("Final result: {}\n", .{result});
 }
