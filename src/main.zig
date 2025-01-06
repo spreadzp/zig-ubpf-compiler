@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const UbpfError = error{
     Ok,
@@ -13,6 +14,8 @@ pub const UbpfError = error{
     InvalidHelper,
     MaxInstructionsExceeded,
     Unknown,
+    FailedToCreateVm,
+    InvalidVmPointer,
 };
 
 pub const UbpfVm = opaque {};
@@ -32,20 +35,56 @@ pub const Vm = struct {
     const Self = @This();
 
     pub fn init() !Self {
-        std.debug.print("Creating VM...\n", .{});
+        // Print detailed environment info
+        std.debug.print("Debug: Starting VM initialization\n", .{});
+        std.debug.print("Debug: Build mode: {}\n", .{builtin.mode});
+        std.debug.print("Debug: OS: {}\n", .{builtin.os.tag});
+        std.debug.print("Debug: CPU: {}\n", .{builtin.cpu.arch});
+
+        // Check library loading
+        const stderr = std.io.getStdErr().writer();
+        try stderr.print("Debug: Checking library status...\n", .{});
+
+        // Create an allocator
+        var env_map = try std.process.getEnvMap(std.heap.page_allocator);
+        defer env_map.deinit();
+
+        // Check LD_LIBRARY_PATH
+        if (env_map.get("LD_LIBRARY_PATH")) |lib_path| {
+            try stderr.print("Debug: LD_LIBRARY_PATH={s}\n", .{lib_path});
+        } else {
+            try stderr.print("Warning: LD_LIBRARY_PATH not set\n", .{});
+        }
+
+        // Try to create VM
+        try stderr.print("Debug: Attempting ubpf_create()\n", .{});
         const vm = ubpf_create();
+
         if (vm == null) {
-            std.debug.print("Failed to create VM\n", .{});
+            try stderr.print("Error: VM creation failed - null pointer returned\n", .{});
             return error.FailedToCreateVm;
         }
-        std.debug.print("VM created successfully at {*}\n", .{vm});
+
+        // Verify VM pointer
+        const vm_ptr = @intFromPtr(vm);
+        if (vm_ptr == 0) {
+            try stderr.print("Error: Invalid VM pointer (0x0)\n", .{});
+            return error.InvalidVmPointer;
+        }
+
+        try stderr.print("Success: VM created at address: {*}\n", .{vm});
         return Self{ .vm = vm };
     }
 
     pub fn deinit(self: *Self) void {
         if (self.vm) |vm| {
-            std.debug.print("Destroying VM at {*}\n", .{vm});
-            ubpf_destroy(vm);
+            const vm_ptr = @intFromPtr(vm);
+            if (vm_ptr != 0) {
+                std.debug.print("Debug: Destroying VM at {*}\n", .{vm});
+                ubpf_destroy(vm);
+            } else {
+                std.debug.print("Warning: Attempted to destroy VM with null pointer\n", .{});
+            }
             self.vm = null;
         }
     }
@@ -108,15 +147,18 @@ pub const Vm = struct {
 };
 
 pub fn main() !void {
-    std.debug.print("Starting program\n", .{});
+    const stderr = std.io.getStdErr().writer();
+    try stderr.print("Debug: Program starting\n", .{});
 
-    var vm = try Vm.init();
+    var vm = Vm.init() catch |err| {
+        try stderr.print("Error initializing VM: {}\n", .{err});
+        return err;
+    };
     defer vm.deinit();
 
     std.debug.print("Enabling error printing\n", .{});
     vm.setErrorPrint(true);
 
-    // Helper function with safe type conversion
     const printHelper = struct {
         fn helper(_: ?*UbpfVm, args: [*]const u64) callconv(.C) i64 {
             std.debug.print("Helper called with args at {*}\n", .{args});
@@ -129,19 +171,15 @@ pub fn main() !void {
         }
     };
 
-    std.debug.print("Registering helper function\n", .{});
     try vm.registerHelper(1, &printHelper.helper);
 
-    // Example BPF code (just a placeholder)
     const code = [_]u8{
         // mov64 r0, 1
         0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
     };
 
-    std.debug.print("Loading BPF code\n", .{});
     try vm.load(&code);
 
-    std.debug.print("Executing BPF code\n", .{});
     const result = try vm.exec(null);
     std.debug.print("Final result: {}\n", .{result});
 }

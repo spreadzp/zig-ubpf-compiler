@@ -25,6 +25,11 @@ To use the uBPF VM, execute the `ubpf-vm` executable and provide the BPF bytecod
 nm -D lib/libubpf.so
 ldd lib/libubpf.so
 zig run src/main.zig -fPIC lib/libubpf.so
+zig run src/main.zig -lc
+
+ls -l lib/libubpf.so
+LD_LIBRARY_PATH=./lib zig run src/main.zig -fPIC lib/libubpf.so 
+
 ```
  
 This will execute the BPF bytecode within the sandboxed environment of the uBPF VM. 
