@@ -76,107 +76,13 @@ The example in `src/main.zig` demonstrates:
 - Loading a simple BPF program
 - Executing the program
 - Handling errors and cleanup
-
-## Troubleshooting
-
-If you encounter linking issues, ensure:
-1. The library is properly built and extracted to the `lib` directory
-2. The library has correct permissions
-3. You're using the correct linking flags when running the program
-
-For any issues, run the verify-lib.sh script to perform a complete verification of the setup.
-
-## Usage
-
-To use the uBPF VM, execute the `ubpf-vm` executable and provide the BPF bytecode as input. For example:
-
-```bash
-
-docker images zig_builder: // check if we have the base image
-docker build -f zig-external-libs/ubpf.dockerfile -t ubpf-builder .   // build the uBPF image:
-//  extract the library from the container:
-docker create --name ubpf-temp ubpf-builder
-// copy
-docker cp ubpf-temp:/opt/ubpf/lib/libubpf.so ./lib/ 
-// cleanup
-docker rm ubpf-temp
-
-// check
-ls -l lib/libubpf.so
-// run the program
-env LD_PRELOAD=./lib/libubpf.so zig run src/main.zig
-
-zig build
-env LD_LIBRARY_PATH=/lib ./main
-
-zig run src/main.zig -lc -L ./lib -lubpf -rpath $ORIGIN/lib
-
-./zig-out/bin/ubpf-vm
-
-nm -D lib/libubpf.so
-ldd lib/libubpf.so
-zig run src/main.zig -fPIC lib/libubpf.so 
-
-ls -l lib/libubpf.so
-LD_LIBRARY_PATH=./lib zig run src/main.zig -fPIC lib/libubpf.so 
-env LD_DEBUG=all LD_LIBRARY_PATH=./lib zig run src/main.zig -fPIC lib/libubpf.so
-
-```
  
-This will execute the BPF bytecode within the sandboxed environment of the uBPF VM. 
-
-##  setup commands
-```
- 
-```
-
-## Running the Program
-
-```bash 
- 
-
-```
-## Example Code
-The following Zig code demonstrates a simple BPF program that adds two numbers:
-
-```zig
-  const code = [_]u8{
-        0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // mov r0, 1
-        0xb7, 0x01, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, // mov r1, 2
-        0x0f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // add r0, r1
-        0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // exit
-    };
-
-```
-
-## Expected Result: 
 
 After executing the code, the result should be 3.
-![image](https://github.com/user-attachments/assets/7002faa9-63c6-41c9-a9d2-0c5d96888d58)
+![Screenshot from 2025-01-06 16-04-23](https://github.com/user-attachments/assets/83cd3fbc-c714-402a-b890-f6670056449e)
 
-## Memory Usage
-Check memory usage with the following screencast:
 
-[Screencast from 01-03-2025 10:03:54 PM.webm](https://github.com/user-attachments/assets/43ff7cd7-077d-4a0c-b4a6-7af146d6da3e)
-
-## Debugging Commands
- ```bash
-
-zig build --verbose-link
-zig build-exe src/main.zig -Iinclude -Llib -lubpf -lc -static
-
-gdb ./zig-out/bin/ubpf-vm
-break main
-break ubpf_load
-run
-print vm
-print code
-print load_result
-
-valgrind ./zig-out/bin/ubpf-vm
-valgrind --leak-check=full ./zig-out/bin/ubpf-vm
-
-```
+ 
 ## Contributing
 
 Contributions are welcome! Please read our contributing guidelines and code of conduct before submitting pull requests.
