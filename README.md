@@ -15,20 +15,111 @@ This project is a uBPF (universal Berkeley Packet Filter) virtual machine implem
 
 
 
+## Prerequisites
+
+- Docker
+- Zig compiler
+- Base zig_builder image
+
+## Setup Instructions
+
+1. Verify you have the base zig_builder image:
+```bash
+docker images zig_builder
+```
+
+2. Build and extract the uBPF library:
+```bash
+# Build the uBPF Docker image
+docker build -f zig-external-libs/ubpf.dockerfile -t ubpf-builder .
+
+# Extract the library from the container
+docker create --name ubpf-temp ubpf-builder
+docker cp ubpf-temp:/opt/ubpf/lib/libubpf.so ./lib/
+docker rm ubpf-temp
+```
+
+Alternatively, you can run the verification script that handles the setup and verification:
+```bash
+chmod +x setup-lib.sh
+./setup-lib.sh
+```
+
+## Running the Program
+
+The main program demonstrates loading and executing a simple BPF program that adds two numbers:
+
+```bash
+# Run the main program
+zig run src/main.zig -lc -L ./lib -lubpf -rpath $ORIGIN/lib
+```
+
+## Verifying the Library
+
+You can verify the library setup manually with these commands:
+
+```bash
+# Check library symbols
+nm -D lib/libubpf.so
+
+# Check library dependencies
+ldd lib/libubpf.so
+
+# Check library permissions
+ls -l lib/libubpf.so
+```
+
+## Example Code
+
+The example in `src/main.zig` demonstrates:
+- Creating a uBPF VM instance
+- Loading a simple BPF program
+- Executing the program
+- Handling errors and cleanup
+
+## Troubleshooting
+
+If you encounter linking issues, ensure:
+1. The library is properly built and extracted to the `lib` directory
+2. The library has correct permissions
+3. You're using the correct linking flags when running the program
+
+For any issues, run the verify-lib.sh script to perform a complete verification of the setup.
+
 ## Usage
 
 To use the uBPF VM, execute the `ubpf-vm` executable and provide the BPF bytecode as input. For example:
 
 ```bash
+
+docker images zig_builder: // check if we have the base image
+docker build -f zig-external-libs/ubpf.dockerfile -t ubpf-builder .   // build the uBPF image:
+//  extract the library from the container:
+docker create --name ubpf-temp ubpf-builder
+// copy
+docker cp ubpf-temp:/opt/ubpf/lib/libubpf.so ./lib/ 
+// cleanup
+docker rm ubpf-temp
+
+// check
+ls -l lib/libubpf.so
+// run the program
+env LD_PRELOAD=./lib/libubpf.so zig run src/main.zig
+
+zig build
+env LD_LIBRARY_PATH=/lib ./main
+
+zig run src/main.zig -lc -L ./lib -lubpf -rpath $ORIGIN/lib
+
 ./zig-out/bin/ubpf-vm
 
 nm -D lib/libubpf.so
 ldd lib/libubpf.so
-zig run src/main.zig -fPIC lib/libubpf.so
-zig run src/main.zig -lc
+zig run src/main.zig -fPIC lib/libubpf.so 
 
 ls -l lib/libubpf.so
 LD_LIBRARY_PATH=./lib zig run src/main.zig -fPIC lib/libubpf.so 
+env LD_DEBUG=all LD_LIBRARY_PATH=./lib zig run src/main.zig -fPIC lib/libubpf.so
 
 ```
  
@@ -36,17 +127,13 @@ This will execute the BPF bytecode within the sandboxed environment of the uBPF 
 
 ##  setup commands
 ```
-cd vm
-cmake -B ../build
-cd build
-make  # Creates build/libubpf.a
+ 
 ```
 
 ## Running the Program
 
 ```bash 
- zig build  # Creates zig-out/bin/ubpf-vm
-./zig-out/bin/ubpf-vm  # Runs the code in the VM
+ 
 
 ```
 ## Example Code
