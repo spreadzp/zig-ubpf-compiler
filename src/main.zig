@@ -33,7 +33,8 @@ pub fn main() !void {
     std.debug.print("Debug: uBPF VM created successfully at address: {*}\n", .{vm});
 
     // Get BPF bytecode from validator
-    const validator = try validator_mod.Validator.init();
+    var validator = try validator_mod.Validator.init();
+    defer validator.deinit();
     const code = try validator.validate_code();
 
     std.debug.print("Debug: BPF bytecode prepared, length: {}\n", .{code.len});
