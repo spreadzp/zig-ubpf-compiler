@@ -52,6 +52,9 @@ The main program demonstrates loading and executing a simple BPF program that ad
 ```bash
 # Run the main program
 zig run src/main.zig -lc -L ./lib -lubpf -rpath $ORIGIN/lib
+
+zig build-exe src/main.zig -lc -L ./lib -lubpf -rpath $ORIGIN/lib -fno-strip
+lldb ./main
 ```
 
 ## Verifying the Library

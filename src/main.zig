@@ -36,14 +36,6 @@ pub fn main() !void {
     const validator = try validator_mod.Validator.init();
     const code = try validator.validate_code();
 
-    // Example BPF bytecode - a program that adds 1 and 2
-    // const code align(8) = [_]u8{
-    //     0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // mov r0, 1
-    //     0xb7, 0x01, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, // mov r1, 2
-    //     0x0f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // add r0, r1
-    //     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // exit
-    // };
-
     std.debug.print("Debug: BPF bytecode prepared, length: {}\n", .{code.len});
     std.debug.print("Debug: Code pointer: {*}, alignment: {}\n", .{ code.ptr, @alignOf(@TypeOf(code)) });
 

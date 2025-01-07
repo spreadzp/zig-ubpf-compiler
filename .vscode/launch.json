@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Zig Program",
+            "program": "${workspaceFolder}/zig-out/bin/ubpf-vm", // Path to the executable
+            "args": [], // Command-line arguments (if any)
+            "cwd": "${workspaceFolder}", // Working directory
+            "env": {
+                "LD_LIBRARY_PATH": "${workspaceFolder}/lib" // Set library path
+            },
+            "preLaunchTask": "build"
+        }
+    ]
+}
