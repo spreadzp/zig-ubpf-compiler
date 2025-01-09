@@ -13,7 +13,21 @@ This project is a uBPF (universal Berkeley Packet Filter) virtual machine implem
 - **src**: Contains the source code for the uBPF VM and BPF bytecode loader.
 - **vm**: Houses the virtual machine implementation, including the sandboxed environment.
 
+## program  compile
 
+### step1 
+```bash
+zig build-lib src/program.zig -target bpfeb-freestanding-none -O ReleaseFast
+objdump -s -j .text libprogram.a.o
+```
+### step2
+```bash
+zig run converter.zig  
+```
+### Run the main program in uBPF vm
+```bash
+zig run src/main.zig -lc -L ./lib -lubpf -rpath $ORIGIN/lib
+```
 
 ## Prerequisites
 

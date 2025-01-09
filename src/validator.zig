@@ -36,7 +36,7 @@ pub const Validator = struct {
 
     pub fn validate_code(self: *Validator) ![]const u8 {
         // Read the code from file
-        const file = try std.fs.cwd().openFile("src/code.txt", .{});
+        const file = try std.fs.cwd().openFile("src/bpf_program.txt", .{});
         defer file.close();
 
         var buffer: [1024]u8 = undefined;
@@ -67,7 +67,7 @@ pub const Validator = struct {
 
                     if (byte_count == 8) {
                         // Validate instruction before adding
-                        try self.instructor.validate_instruction(&instruction_bytes);
+                       try self.instructor.validate_instruction(&instruction_bytes);
 
                         @memcpy(code_struct.bytes[code_index .. code_index + 8], &instruction_bytes);
                         std.debug.print("Instruction at {}: ", .{code_index});
@@ -118,7 +118,7 @@ pub const Validator = struct {
             entry.value_ptr.* = true;
 
             // Analyze control flow
-            const opcode = code[pc];
+             const opcode = code[pc];
             if (opcode == 0x95) { // exit
                 break; // Found valid exit
             }
